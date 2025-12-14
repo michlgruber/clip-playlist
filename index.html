@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Clip-Playlist (Google Sheets)</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+  #playlist { list-style: none; padding: 0; margin: 20px auto; width: 750px; }
+  #playlist li {
+    padding: 10px; margin: 6px 0;
+    background: #f0f0f0; border: 1px solid #ccc;
+    display: flex; flex-wrap: wrap; gap: 6px;
+    align-items: center;
+  }
+  input[type="text"], input[type="number"] { width: 120px; }
+  button { cursor: pointer; }
+  .spacer { margin-top: 3em; }
+</style>
+</head>
+<body>
+
+<h1>Clip-Playlist (Google Sheets)</h1>
+
+<div>
+  <button onclick="loadSheet()">📥 Playlist aus Google Sheets laden</button>
+</div>
+
+<ul id="playlist"></ul>
+
+<div class="spacer">
+  <button onclick="playPlaylist()">▶ Playlist starten</button>
+</div>
+
+<div id="player"></div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+
+<script>
+const playlist = document.getElementById("playlist");
+let clips = [];
+let current = 0;
+let player = null;
+
+/* ===== YouTube API ===== */
+function onYouTubeIframeAPIReady() {}
+
+/* ===== Playlist laden ===== */
+function loadSheet() {
+  const csvUrl = "HIER_DEIN_CSV_LINK_EINFÜGEN"; // <---- hier CSV-Link einfügen
+  fetch(csvUrl)
+    .then(res => res.text())
+    .then(text => {
+      clips = text.split("\n").slice(1).filter(line => line.trim()).map(line => {
+        const [url, start, end, comment] = line.split(",");
+        const idMatch = url.match(/(?:v=|\.be\/)([a-zA-Z0-9_-]{11})/);
+        if(!idMatch) return null;
+        return { id: idMatch[1], start: Number(start), end: Number(end), comment: comment || "" };
+      }).filter(c => c !== null);
+      render();
+      alert("Playlist aus Google Sheets geladen!");
+    })
+    .catch(err => alert("Fehler beim Laden der Google Sheets CSV: " + err));
+}
+
+/* ===== Playlist anzeigen ===== */
+function render() {
+  playlist.innerHTML = "";
+  clips.forEach((c, i) => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      ${c.id}
+      Start <input type="number" value="${c.start}" onchange="edit(${i},'start',this.value)">
+      End <input type="number" value="${c.end}" onchange="edit(${i},'end',this.value)">
+      Kommentar <input type="text" value="${c.comment}" maxlength="150" onchange="edit(${i},'comment',this.value)">
+    `;
+    playlist.appendChild(li);
+  });
+}
+
+/* ===== Player erzeugen / Clip abspielen ===== */
+function playPlaylist() {
+  if (!clips.length) return;
+  current = 0;
+  playClip(current);
+}
+
+function playClip(i) {
+  const c = clips[i];
+  if (!player) {
+    player = new YT.Player('player', {
+      height: '450',
+      width: '800',
+      videoId: c.id,
+      playerVars: { start: c.start, end: c.end, origin: location.origin },
+      events: { onStateChange }
+    });
+  } else {
+    player.loadVideoById({ videoId: c.id, startSeconds: c.start, endSeconds: c.end });
+  }
+}
+
+/* ===== Weiter zum nächsten Clip ===== */
+function onStateChange(e) {
+  if (e.data === YT.PlayerState.ENDED) {
+    current++;
+    if (current < clips.length) playClip(current);
+  }
+}
+
+/* ===== Bearbeiten ===== */
+function edit(i, k, v) { clips[i][k] = k === 'comment' ? v : Number(v); }
+
+</script>
+</body>
+</html>
