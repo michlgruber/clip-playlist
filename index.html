@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Clip-Playlist</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+  #playlist { list-style: none; padding: 0; margin: 20px auto; width: 560px; }
+  #playlist li {
+    padding: 10px; margin: 6px 0;
+    background: #f0f0f0; border: 1px solid #ccc;
+    display: flex; flex-wrap: wrap; gap: 6px;
+    align-items: center;
+  }
+  input { width: 60px; }
+  button { cursor: pointer; }
+</style>
+</head>
+<body>
+
+<h1>Clip-Playlist</h1>
+
+<div>
+  <input id="videoUrl" placeholder="YouTube-Link" size="42">
+  Start <input id="startTime" type="number" value="0">
+  End <input id="endTime" type="number" value="10">
+  <button onclick="addClip()">➕ Clip</button>
+</div>
+
+<ul id="playlist"></ul>
+
+<button onclick="playPlaylist()">▶ Playlist starten</button>
+
+<h3>Player</h3>
+<div id="player"></div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+
+<script>
+const videoUrl  = document.getElementById("videoUrl");
+const startTime = document.getElementById("startTime");
+const endTime   = document.getElementById("endTime");
+const playlist  = document.getElementById("playlist");
+
+let clips = [];
+let current = 0;
+let player = null;
+
+/* ===== YouTube API ===== */
+function onYouTubeIframeAPIReady() {
+  // Player wird erst erzeugt, wenn ein Clip abgespielt wird
+}
+
+/* ===== Clip hinzufügen ===== */
+function addClip() {
+  const url = videoUrl.value.trim();
+  const start = Number(startTime.value) || 0;
+  const end   = Number(endTime.value) || start + 10;
+
+  const match = url.match(/(?:v=|\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (!match) {
+    alert("Ungültiger YouTube-Link");
+    return;
+  }
+
+  clips.push({ id: match[1], start, end });
+  videoUrl.value = "";
+  render();
+}
+
+/* ===== Playlist anzeigen ===== */
+function render() {
+  playlist.innerHTML = "";
+  clips.forEach((c, i) => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      ${c.id}
+      Start <input type="number" value="${c.start}" onchange="edit(${i},'start',this.value)">
+      End <input type="number" value="${c.end}" onchange="edit(${i},'end',this.value)">
+      <button onclick="removeClip(${i})">✖</button>
+    `;
+    playlist.appendChild(li);
+  });
+}
+
+/* ===== Player erzeugen ===== */
+function ensurePlayer(videoId) {
+  if (!player) {
+    player = new YT.Player('player', {
+      height: '450',
+      width: '800',
+      videoId,
+      playerVars: { origin: location.origin },
+      events: { onStateChange }
+    });
+  }
+}
+
+/* ===== Playlist abspielen ===== */
+function playPlaylist() {
+  if (!clips.length) return;
+  current = 0;
+  playClip(current);
+}
+
+function playClip(i) {
+  const c = clips[i];
+  ensurePlayer(c.id);
+  player.loadVideoById({
+    videoId: c.id,
+    startSeconds: c.start,
+    endSeconds: c.end
+  });
+}
+
+/* ===== Weiter zum nächsten Clip ===== */
+function onStateChange(e) {
+  if (e.data === YT.PlayerState.ENDED) {
+    current++;
+    if (current < clips.length) playClip(current);
+  }
+}
+
+/* ===== Bearbeiten & Löschen ===== */
+function edit(i, k, v) { clips[i][k] = Number(v); }
+function removeClip(i) { clips.splice(i, 1); render(); }
+</script>
+
+</body>
+</html>
